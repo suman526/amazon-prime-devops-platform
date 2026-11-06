@@ -2,22 +2,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pandacloud-app
+  name: sumancloud-app
   labels:
-    app: pandacloud-app
+    app: sumancloud-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: pandacloud-app
+      app: sumancloud-app
   template:
     metadata:
       labels:
-        app: pandacloud-app
+        app: sumancloud-app
     spec:
       containers:
-      - name: pandacloud-container
-        image: 309395755719.dkr.ecr.us-east-1.amazonaws.com/amazon-prime:latest
+      - name: sumancloud-container
+        image: 776502241773.dkr.ecr.us-east-1.amazonaws.com/amazon-prime@sha256:ba0132643a8266b025582f47d139afa9c9e53f066beba8ce38efb2cfc0aed0a6
         ports:
         - containerPort: 3000
 ...
