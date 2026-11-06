@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: sumancloud-container
-        image: 776502241773.dkr.ecr.us-east-1.amazonaws.com/amazon-prime@sha256:ba0132643a8266b025582f47d139afa9c9e53f066beba8ce38efb2cfc0aed0a6
+        image: 776502241773.dkr.ecr.us-east-1.amazonaws.com/amazon-prime:latest
         ports:
         - containerPort: 3000
 ...
