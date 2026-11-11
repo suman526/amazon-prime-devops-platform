@@ -1,6 +1,7 @@
 <<<<<<< HEAD
 # Amazon Prime Clone Deployment Project
-![Pipeline Overview](./src/Overview.png)
+![Pipeline Overview](<img width="554" height="309" alt="Animated DevOps Pipeline Flow final" src="https://github.com/user-attachments/assets/7fc35eb5-ad36-4845-a229-c7154819346a" />
+)
 
 ## Project Overview
 This project demonstrates deploying an Amazon Prime clone using a set of DevOps tools and practices. The primary tools include:
@@ -31,7 +32,7 @@ This project demonstrates deploying an Amazon Prime clone using a set of DevOps 
 ## Infrastructure Setup Using Terraform
 1. **Clone the Repository** (Open Command Prompt & run below):
    ```bash
-   git clone https://github.com/pandacloud1/DevopsProject2.git
+   git clone https://github.com/suman526/amazon-prime-devops-platform.git
    cd DevopsProject2
    code .   # this command will open VS code in backend
    ```
@@ -90,8 +91,6 @@ Create a Jenkins pipeline by adding the following script:
 ###############################################################################
 
 # This block defines the Terraform version requirements and AWS provider.
-# The AWS provider allows Terraform to communicate with AWS services
-# and manage infrastructure resources programmatically.
 
 terraform {
   required_providers {
@@ -103,8 +102,6 @@ terraform {
 }
 
 # AWS Provider Configuration
-# The provider uses the region_name variable to determine the AWS region
-# in which all AWS infrastructure resources will be created.
 
 provider "aws" {
   region = var.region_name
@@ -937,9 +934,7 @@ pipeline {
 ```
 
 ## Additional Information
-For further details, refer to the word document containing a complete write-up of the project.
+For further details, refer to the blog : 
 
 ---
 =======
-
->>>>>>> 0f10f0a82aac8d62f29b36d0d7bf75bfbc5de8ff
