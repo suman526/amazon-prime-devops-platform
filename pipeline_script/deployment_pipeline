@@ -75,20 +75,26 @@ pipeline {
             steps {
                 script {
                     sh """
-                        # Create ArgoCD namespace if it does not exist
+                        # Step 1: Create ArgoCD namespace if it does not exist
                         kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 
-                        # Install ArgoCD using Server-Side Apply
-                        # Force conflicts to resolve existing field ownership
-                        kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+                        # Step 2: Install ArgoCD using Server-Side Apply
+                        # Force resolution of existing field ownership conflicts
+                        kubectl apply \
+                            --server-side \
+                            --force-conflicts \
+                            -n argocd \
+                            -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-                        # Expose ArgoCD server using LoadBalancer
+                        # Step 3: Expose ArgoCD server using LoadBalancer
                         kubectl patch svc argocd-server \
                             -n argocd \
                             -p '{"spec": {"type": "LoadBalancer"}}'
 
-                        # Verify ArgoCD installation
+                        # Step 4: Verify ArgoCD pods
                         kubectl get pods -n argocd
+
+                        # Step 5: Verify ArgoCD services
                         kubectl get svc -n argocd
                     """
                 }
