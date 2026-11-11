@@ -735,6 +735,7 @@ output "PRIVATE-IP" {
 
 ### Deployment Pipeline
 ```groovy
+
 pipeline {
     agent any
 
@@ -743,58 +744,111 @@ pipeline {
     }
 
     parameters {
-        string(name: 'CLUSTER_NAME', defaultValue: 'amazon-prime-cluster', description: 'Enter your EKS cluster name')
+        string(
+            name: 'CLUSTER_NAME',
+            defaultValue: 'amazon-prime-cluster',
+            description: 'Enter your EKS cluster name'
+        )
     }
 
     stages {
+
+        // Stage 1: Login to EKS
         stage("Login to EKS") {
             steps {
                 script {
-                    withCredentials([string(credentialsId: 'access-key', variable: 'AWS_ACCESS_KEY'),
-                                     string(credentialsId: 'secret-key', variable: 'AWS_SECRET_KEY')]) {
-                        sh "aws eks --region us-east-1 update-kubeconfig --name ${params.CLUSTER_NAME}"
+                    withCredentials([
+                        string(credentialsId: 'access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        sh """
+                            aws eks --region us-east-1 update-kubeconfig --name ${params.CLUSTER_NAME}
+                            kubectl get nodes
+                        """
                     }
                 }
             }
         }
 
+        // Stage 2: Configure Prometheus & Grafana
         stage("Configure Prometheus & Grafana") {
             steps {
                 script {
                     sh """
-                    helm repo add stable https://charts.helm.sh/stable || true
-                    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
-                    # Check if namespace 'prometheus' exists
-                    if kubectl get namespace prometheus > /dev/null 2>&1; then
-                        # If namespace exists, upgrade the Helm release
-                        helm upgrade stable prometheus-community/kube-prometheus-stack -n prometheus
-                    else
-                        # If namespace does not exist, create it and install Helm release
-                        kubectl create namespace prometheus
-                        helm install stable prometheus-community/kube-prometheus-stack -n prometheus
-                    fi
-                    kubectl patch svc stable-kube-prometheus-sta-prometheus -n prometheus -p '{"spec": {"type": "LoadBalancer"}}'
-                    kubectl patch svc stable-grafana -n prometheus -p '{"spec": {"type": "LoadBalancer"}}'
+                        # Add Prometheus Helm repository
+                        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+
+                        # Update Helm repositories
+                        helm repo update
+
+                        # Create Prometheus namespace if it does not exist
+                        kubectl create namespace prometheus --dry-run=client -o yaml | kubectl apply -f -
+
+                        # Install or upgrade Prometheus and Grafana
+                        helm upgrade --install stable prometheus-community/kube-prometheus-stack \
+                            -n prometheus \
+                            --wait \
+                            --timeout 10m
+
+                        # Expose Prometheus using LoadBalancer
+                        kubectl patch svc stable-kube-prometheus-sta-prometheus \
+                            -n prometheus \
+                            -p '{"spec": {"type": "LoadBalancer"}}'
+
+                        # Expose Grafana using LoadBalancer
+                        kubectl patch svc stable-grafana \
+                            -n prometheus \
+                            -p '{"spec": {"type": "LoadBalancer"}}'
+
+                        # Verify Prometheus and Grafana
+                        kubectl get pods -n prometheus
+                        kubectl get svc -n prometheus
                     """
                 }
             }
         }
 
+        // Stage 3: Configure ArgoCD
         stage("Configure ArgoCD") {
             steps {
                 script {
                     sh """
-                    # Install ArgoCD
-                    kubectl create namespace argocd || true
-                    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-                    kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+                        # Create ArgoCD namespace if it does not exist
+                        kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+
+                        # Install ArgoCD using Server-Side Apply
+                        # Force conflicts to resolve existing field ownership
+                        kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+                        # Expose ArgoCD server using LoadBalancer
+                        kubectl patch svc argocd-server \
+                            -n argocd \
+                            -p '{"spec": {"type": "LoadBalancer"}}'
+
+                        # Verify ArgoCD installation
+                        kubectl get pods -n argocd
+                        kubectl get svc -n argocd
                     """
                 }
             }
         }
-		
+    }
+
+    post {
+        success {
+            echo 'DevOps deployment pipeline completed successfully!'
+        }
+
+        failure {
+            echo 'DevOps deployment pipeline failed. Check the stage logs.'
+        }
+
+        always {
+            echo 'Jenkins pipeline execution finished.'
+        }
     }
 }
+
 ```
 
 ## Cleanup
