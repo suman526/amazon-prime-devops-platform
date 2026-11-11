@@ -21,16 +21,16 @@ module "eks" {
   subnet_ids               = module.vpc.private_subnets
 
   eks_managed_node_groups = {
-    panda-node = {
+    suman-node = {
       min_size     = 2
       max_size     = 4
       desired_size = 2
 
-      instance_types = ["t2.medium"]
+      instance_types = ["c7i-flex.large"]
       capacity_type  = "SPOT"
 
       tags = {
-        ExtraTag = "Panda_Node"
+        ExtraTag = "suman_Node"
       }
     }
   }
