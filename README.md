@@ -932,6 +932,6 @@ pipeline {
 ```
 
 ## Additional Information
-For further details, refer to the blog : 
+For further details, refer to the blog : https://suman15.medium.com/building-an-end-to-end-devops-ci-cd-pipeline-for-an-amazon-prime-video-clone-using-aws-terraform-ae0f2ab152f9?sharedUserId=suman15
 
 ---
