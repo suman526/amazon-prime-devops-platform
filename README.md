@@ -1,6 +1,5 @@
-<<<<<<< HEAD
 # Amazon Prime Clone Deployment Project
-![Pipeline Overview](<img width="554" height="309" alt="Animated DevOps Pipeline Flow final" src="https://github.com/user-attachments/assets/7fc35eb5-ad36-4845-a229-c7154819346a" />
+![Pipeline Overview](<img width="544" height="243" alt="Screenshot (431)" src="https://github.com/user-attachments/assets/00e82d3e-7486-4229-8029-e96412d0458c" />
 )
 
 ## Project Overview
@@ -937,4 +936,3 @@ pipeline {
 For further details, refer to the blog : 
 
 ---
-=======
