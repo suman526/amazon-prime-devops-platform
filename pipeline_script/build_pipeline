@@ -1,30 +1,69 @@
+
 pipeline {
+    // agent any means Jenkins can execute this pipeline
+    // on any available Jenkins agent/node.
     agent any
-    
-    parameters {
-        string(name: 'ECR_REPO_NAME', defaultValue: 'amazon-prime', description: 'Enter repository name')
-        string(name: 'AWS_ACCOUNT_ID', defaultValue: '123456789012', description: 'Enter AWS Account ID') // Added missing quote
-    }
-    
+
+    // Specifies the tools configured in Jenkins Global Tool Configuration.
     tools {
+        // Uses the JDK installation configured with the name 'JDK'.
         jdk 'JDK'
+
+        // Uses the NodeJS installation configured with the name 'NodeJS'.
         nodejs 'NodeJS'
     }
-    
+
+    // Defines user-input parameters that can be configured
+    // whenever someone starts this Jenkins pipeline.
+    parameters {
+
+        // ECR_REPO_NAME: Name of the AWS ECR repository
+        // where the Docker image will be stored.
+        // Default value is 'amazon-prime'.
+        string(name: 'ECR_REPO_NAME', defaultValue: 'amazon-prime', description: 'Enter repository name')
+
+        // AWS_ACCOUNT_ID: AWS account ID used to construct
+        // the ECR registry URL.
+        // Replace the default value with your actual AWS Account ID.
+        string(name: 'AWS_ACCOUNT_ID', defaultValue: '123456789012', description: 'Enter AWS Account ID') // Added missing quote
+    }
+
+    // Defines environment variables available throughout the pipeline.
     environment {
+
+        // Fetches the SonarQube Scanner installation path
+        // from Jenkins Global Tool Configuration.
+        // This path is stored in SCANNER_HOME.
         SCANNER_HOME = tool 'SonarQube Scanner'
     }
-    
+
+    // stages contains all the individual stages of the CI/CD pipeline.
     stages {
-        stage('1. Git Checkout') {
+
+        // STAGE 1: GIT CHECKOUT
+        stage('1. GIT Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/pandacloud1/DevopsProject2.git'
+
+                // Downloads the source code from the GitHub repository.
+                // Checks out the main branch.
+                // Jenkins uses this source code for all subsequent stages.
+                git branch: 'main',
+                url: 'https://github.com/suman526/amazon-prime-devops-platform.git'
             }
         }
-        
+
+        // STAGE 2: SONARQUBE ANALYSIS
         stage('2. SonarQube Analysis') {
             steps {
-                withSonarQubeEnv ('sonar-server') {
+
+                // Connects Jenkins to the SonarQube server.
+                // 'sonar-server' is the SonarQube installation name
+                // configured in Jenkins System Configuration.
+                withSonarQubeEnv('sonar-server') {
+
+                    // Executes the SonarQube Scanner.
+                    // The scanner analyzes the source code and sends
+                    // the analysis results to the SonarQube server.
                     sh """
                     $SCANNER_HOME/bin/sonar-scanner \
                     -Dsonar.projectName=amazon-prime \
@@ -33,79 +72,187 @@ pipeline {
                 }
             }
         }
-        
-        stage('3. Quality Gate') {
+
+        // STAGE 3: SONARQUBE QUALITY GATE
+        stage('3. SonarQube Quality Gate') {
             steps {
-                waitForQualityGate abortPipeline: false, 
-                credentialsId: 'sonar-token'
+
+                // Waits for SonarQube to complete the Quality Gate evaluation.
+                // Quality Gate checks whether the code meets the
+                // configured quality conditions.
+                //
+                // abortPipeline: false means the pipeline will NOT stop
+                // even if the Quality Gate fails.
+                //
+                // credentialsId identifies the SonarQube token
+                // configured in Jenkins Credentials.
+                waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
             }
         }
-        
-        stage('4. Install npm') {
+
+        // STAGE 4: NPM INSTALL
+        stage('4. NPM Install') {
             steps {
-                sh "npm install"
+
+                // Installs all project dependencies listed in package.json.
+                // Downloads the required Node.js packages into node_modules.
+                sh 'npm install'
             }
         }
-        
+
+        // STAGE 5: TRIVY SECURITY SCAN
         stage('5. Trivy Scan') {
             steps {
-                sh "trivy fs . > trivy.txt"
+
+                // Trivy scans the project filesystem for security
+                // vulnerabilities and other detected issues.
+                //
+                // The scan output is redirected into a file named
+                // trivy-scan-result.txt instead of being displayed
+                // directly in the Jenkins console.
+                sh 'trivy fs . > trivy-scan-result.txt'
             }
         }
-        
-        stage('6. Build Docker Image') {
+
+        // STAGE 6: DOCKER IMAGE BUILD
+        stage('6. Docker Image Build') {
             steps {
+
+                // Builds a Docker image using the Dockerfile
+                // present in the current working directory (.).
+                //
+                // -t assigns a name/tag to the Docker image.
+                // The image name comes from the ECR_REPO_NAME parameter.
                 sh "docker build -t ${params.ECR_REPO_NAME} ."
             }
         }
-        
-        stage('7. Create ECR repo') {
+
+        // STAGE 7: CREATE ECR REPOSITORY
+        stage('7. Create ECR Repository') {
             steps {
-                withCredentials([string(credentialsId: 'access-key', variable: 'AWS_ACCESS_KEY'), 
-                                 string(credentialsId: 'secret-key', variable: 'AWS_SECRET_KEY')]) {
+
+                // Retrieves AWS access credentials securely
+                // from Jenkins Credentials.
+                //
+                // access-key = AWS Access Key ID
+                // secret-key = AWS Secret Access Key
+                //
+                // These credentials are temporarily exposed
+                // as environment variables inside this block.
+                withCredentials([string(credentialsId: 'access-key', variable: 'AWS_ACCESS_KEY'),
+                string(credentialsId: 'secret-key', variable: 'AWS_SECRET_KEY')]) {
+
                     sh """
+
+                    // Configures AWS CLI with the access key
+                    // retrieved from Jenkins Credentials.
                     aws configure set aws_access_key_id $AWS_ACCESS_KEY
+
+                    // Configures AWS CLI with the secret access key.
                     aws configure set aws_secret_access_key $AWS_SECRET_KEY
+
+                    // Checks whether the ECR repository already exists.
+                    // If it exists, no new repository is created.
+                    //
+                    // If the describe-repositories command fails,
+                    // the OR (||) operator executes create-repository.
                     aws ecr describe-repositories --repository-names ${params.ECR_REPO_NAME} --region us-east-1 || \
+
+                    // Creates a new Amazon ECR repository
+                    // with the name provided by ECR_REPO_NAME.
+                    // The repository is created in us-east-1.
                     aws ecr create-repository --repository-name ${params.ECR_REPO_NAME} --region us-east-1
                     """
                 }
             }
         }
-        
-        stage('8. Login to ECR & tag image') {
+
+        // STAGE 8: LOGIN TO ECR AND TAG DOCKER IMAGE
+        stage('8. LOGIN to ECR and tag Docker Image') {
             steps {
-                withCredentials([string(credentialsId: 'access-key', variable: 'AWS_ACCESS_KEY'), 
+
+                // Retrieves AWS credentials from Jenkins Credentials.
+                // These credentials are used for AWS authentication.
+                withCredentials([string(credentialsId: 'access-key', variable: 'AWS_ACCESS_KEY'),
                                  string(credentialsId: 'secret-key', variable: 'AWS_SECRET_KEY')]) {
+
                     sh """
+
+                    // Generates a temporary authentication password
+                    // for Amazon ECR using AWS CLI.
+                    //
+                    // The password is passed directly to Docker login
+                    // through a pipe (|).
+                    //
+                    // This authenticates Docker with the ECR registry.
                     aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+
+                    // Tags the locally built Docker image with the
+                    // AWS ECR repository URL and Jenkins BUILD_NUMBER.
+                    //
+                    // BUILD_NUMBER is a Jenkins environment variable
+                    // that identifies the current pipeline build.
+                    // This creates a version-specific image tag.
                     docker tag ${params.ECR_REPO_NAME} ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${params.ECR_REPO_NAME}:${BUILD_NUMBER}
+
+                    // Creates another tag named 'latest'.
+                    // This tag points to the same Docker image
+                    // and represents the most recently built image.
                     docker tag ${params.ECR_REPO_NAME} ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${params.ECR_REPO_NAME}:latest
                     """
                 }
             }
         }
-        
-        stage('9. Push image to ECR') {
+
+        // STAGE 9: PUSH DOCKER IMAGE TO ECR
+        stage('9. Push Docker Image to ECR') {
             steps {
-                withCredentials([string(credentialsId: 'access-key', variable: 'AWS_ACCESS_KEY'), 
+
+                // Retrieves AWS credentials from Jenkins Credentials.
+                withCredentials([string(credentialsId: 'access-key', variable: 'AWS_ACCESS_KEY'),
                                  string(credentialsId: 'secret-key', variable: 'AWS_SECRET_KEY')]) {
+
                     sh """
+
+                    // Pushes the Docker image with the Jenkins
+                    // BUILD_NUMBER tag to the AWS ECR repository.
+                    //
+                    // This maintains a version-specific image
+                    // that can be used for deployments or rollbacks.
                     docker push ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${params.ECR_REPO_NAME}:${BUILD_NUMBER}
+
+                    // Pushes the image with the 'latest' tag to ECR.
+                    // This allows users and deployment tools to refer
+                    // to the most recently pushed image.
                     docker push ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${params.ECR_REPO_NAME}:latest
                     """
                 }
             }
         }
-        
-        stage('10. Cleanup Images') {
+
+        // STAGE 10: CLEANUP DOCKER IMAGES FROM JENKINS SERVER
+        stage('10. Cleanup images from jenkins server') {
             steps {
+
                 sh """
-                docker rmi ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${params.ECR_REPO_NAME}:${BUILD_NUMBER}
-                docker rmi ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${params.ECR_REPO_NAME}:latest
-		docker images
-                """
+
+                    // Removes the locally tagged Docker image
+                    // associated with the current Jenkins BUILD_NUMBER.
+                    //
+                    // This helps free up disk space on the Jenkins server.
+                    docker rmi ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${params.ECR_REPO_NAME}:${BUILD_NUMBER}
+
+                    // Removes the locally tagged image named 'latest'.
+                    // The image has already been pushed to AWS ECR,
+                    // so its remote copy remains available.
+                    docker rmi ${params.AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${params.ECR_REPO_NAME}:latest
+
+                    // Displays the remaining Docker images
+                    // available on the Jenkins server.
+                    docker images
+                    """
             }
         }
     }
 }
+
